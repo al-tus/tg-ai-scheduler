@@ -14,14 +14,6 @@ bot.use( async (ctx, next) => {
     await next();
 })
 
-const TG_TAGS = "b|strong|i|em|u|ins|s|strike|del|code|pre|a|blockquote|tg-spoiler|tg-emoji"
-
-// Оставляет теги Telegram как есть, экранирует только случайные & и <
-function sanitizeTgHtml(s: string): string {
-    return s
-        .replace(/&(?!(?:amp|lt|gt|quot|#\d+);)/g, "&amp;")
-        .replace(new RegExp(`<(?!/?(?:${TG_TAGS})(?:\\s[^>]*)?>)`, "gi"), "&lt;")
-}
 
 async function handleUserRequest(ctx: any, text: string) {
     const replyText = await processUserMessage(text)

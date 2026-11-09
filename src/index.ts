@@ -14,9 +14,18 @@ bot.use( async (ctx, next) => {
     await next();
 })
 
-async function handleUserRequest(ctx:any, text:string){
+const TG_TAGS = "b|strong|i|em|u|ins|s|strike|del|code|pre|a|blockquote|tg-spoiler|tg-emoji"
+
+// Оставляет теги Telegram как есть, экранирует только случайные & и <
+function sanitizeTgHtml(s: string): string {
+    return s
+        .replace(/&(?!(?:amp|lt|gt|quot|#\d+);)/g, "&amp;")
+        .replace(new RegExp(`<(?!/?(?:${TG_TAGS})(?:\\s[^>]*)?>)`, "gi"), "&lt;")
+}
+
+async function handleUserRequest(ctx: any, text: string) {
     const replyText = await processUserMessage(text)
-    await ctx.reply(replyText.content?.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>"), { parse_mode: "HTML" })
+    await ctx.reply(replyText?.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>"), { parse_mode: "HTML" })
 }
 
 bot.on(["message:voice", "message:video_note"], async (ctx) => {
@@ -34,10 +43,16 @@ bot.on(["message:text"], async (ctx) => {
     await handleUserRequest(ctx, userText);
 })
 
+bot.catch((err) => {
+    console.error("Bot error:", err.error)
+    err.ctx.reply("Что-то пошло не так, попробуйте позже.").catch(() => {})
+})
 
 bot.start().catch((err) => {
     console.log(err)
     process.exit(1);
 });
+
+
 
 console.log("Bot running...");

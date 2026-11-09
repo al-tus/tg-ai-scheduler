@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {ChatCompletionTool} from "groq-sdk/resources/chat/completions";
+import {Tool, Type} from '@google/genai';
 
 export const createTaskSchema = z.object({
     title: z.string(),
@@ -14,62 +14,61 @@ export const getScheduleSchema = z.object({
     endDate: z.string(),
 })
 
-export const aiTools: ChatCompletionTool[] = [
+export const aiTools: Tool[] = [
     {
-        type: "function",
-        function: {
-            name: "create_task",
-            description: "Создает новую задачу или напоминание в таск-трекере Microsoft To Do",
-            parameters: {
-                type: "object",
-                properties: {
-                    title: {
-                        type: "string",
-                        description: "Название задачи, четко и по делу (например: 'Сделать лабу по физике')"
+        functionDeclarations: [
+            {
+                name: "create_task",
+                description:
+                    "Создает новую задачу или напоминание в таск-трекере Microsoft To Do",
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                        title: {
+                            type: Type.STRING,
+                            description:
+                                "Название задачи, четко и по делу (например: 'Сделать лабу по физике')",
+                        },
+                        dueDate: {
+                            type: Type.STRING,
+                            description:
+                                "Дата дедлайна в формате YYYY-MM-DD, если она упомянута",
+                        },
+                        addRoMyDay: {
+                            type: Type.BOOLEAN,
+                            description:
+                                "True, если задачу нужно сделать сегодня или добавить в список 'Мой день'",
+                        },
                     },
-                    dueDate: {
-                        type: "string",
-                        description: "Дата дедлайна в формате YYYY-MM-DD, если она упомянута",
-                    },
-                    addRoMyDay: {
-                        type: "boolean",
-                        description: "True, если задачу нужно сделать сегодня или добавить в список 'Мой день'",
-                    }
+                    required: ["title"],
                 },
-                required: ["title"],
-            }
-        }
-    },
-    {
-        type: "function",
-        function: {
-            name: "get_schedule",
-            description: "Получает список запланированных дел, задач, встреч или расписание пользователя на конкретный календарный день",
-            parameters: {
-                type: "object",
-                properties: {
-                    startDate: {
-                        type: "string",
-                        description: "Начальная дата в формате YYYY-MM-DD"
+            },
+            {
+                name: "get_schedule",
+                description:
+                    "Получает список запланированных дел, задач, встреч или расписание пользователя на конкретный календарный день",
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                        startDate: {
+                            type: Type.STRING,
+                            description: "Начальная дата в формате YYYY-MM-DD",
+                        },
+                        endDate: {
+                            type: Type.STRING,
+                            description:
+                                "Конечная дата в формате YYYY-MM-DD (если просят на один день, совпадает со startDate)",
+                        },
                     },
-                    endDate: {
-                        type: "string",
-                        description: "Конечная дата в формате YYYY-MM-DD (если просят на один день, совпадает со startDate)"
-                    }
+                    required: ["startDate", "endDate"],
                 },
-                required: ["startDate", "endDate"],
-            }
-        }
+            },
+            {
+                name: "get_tasks",
+                description:
+                    "Получает список текущих невыполненных задач и дедлайнов из Microsoft To Do",
+                // Для функции без аргументов `parameters` можно просто опустить
+            },
+        ],
     },
-    {
-        type: "function",
-        function: {
-            name: "get_tasks",
-            description: "Получает список текущих невыполненных задач и дедлайнов из Microsoft To Do",
-            parameters: {
-                type: "object",
-                properties: {},
-            }
-        }
-    }
 ]

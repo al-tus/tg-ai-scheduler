@@ -1,13 +1,11 @@
-import Groq from 'groq-sdk'
+import {createPartFromFunctionResponse, GoogleGenAI} from "@google/genai"
 import {config} from './config'
 import {aiTools, createTaskSchema, getScheduleSchema} from "./tools";
-import {ChatCompletionMessage} from "groq-sdk/resources/chat";
-import {ChatCompletionMessageParam} from "groq-sdk/resources/chat";
 import {createTodoTask, getActiveTasks} from "./todo";
 import {getScheduleByRange} from "./schedule";
 import {getSystemPrompt} from "./sp";
 
-const groq = new Groq({ apiKey: config.GROQ_API_KEY })
+const gem = new GoogleGenAI({apiKey: config.GEMINI_API_KEY})
 
 const sp = getSystemPrompt()
 
@@ -16,102 +14,102 @@ export async function transcribeAudio(fileUrl: string): Promise<string> {
     const response = await fetch(fileUrl);
     if (!response.ok) throw new Error("Failed to download file")
 
-    const arrayBuffer = await response.arrayBuffer();
-    const audioFile = new File([arrayBuffer], "voice.ogg", {type: "audio/ogg"});
+    const base64Data = Buffer.from(await response.arrayBuffer()).toString('base64')
 
-    const transcription = await groq.audio.transcriptions.create({
-        file: audioFile,
-        model: "whisper-large-v3-turbo",
-        language: "ru",
+    const transcription = await gem.models.generateContent({
+        model: config.GEMINI_MODEL,
+        contents: [
+            {
+                inlineData: {
+                    data: base64Data,
+                    mimeType: "audio/ogg",
+                }
+            },
+            {text: 'Сделай точную транскрибацию этого аудио на русском языке.'}
+        ]
     })
 
-    return transcription.text;
+    return transcription.text ?? "Не удалось расшифровать аудио.";
 }
 
-export async function processUserMessage(text: string): Promise<ChatCompletionMessage> {
-    const messages: ChatCompletionMessageParam[] = [
-        {
-            role: "system",
-            content: sp
-        },
-        {
-            role: "user",
-            content: text
-        },
-    ];
+export async function processUserMessage(text: string): Promise<string> {
 
-    const chatCompletion = await groq.chat.completions.create({
-        model: config.GROQ_MODEL,
-        messages: messages,
-        tools: aiTools,
-        tool_choice: 'auto',
-        temperature: 0.2,
+    const history = []
+
+    const chat = gem.chats.create({
+        model: config.GEMINI_MODEL,
+        config: {
+            systemInstruction: sp,
+            tools: aiTools
+        }
     });
 
-    const responseMessage = chatCompletion.choices[0].message;
+    const response = await chat.sendMessage({
+        message: text,
+    })
 
-    if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
-        messages.push(responseMessage)
+    if (response.functionCalls && response.functionCalls.length > 0) {
+        for (const functionCall of response.functionCalls) {
+            const functionName = functionCall.name
 
-        for (const toolCall of responseMessage.tool_calls) {
-            const functionName = toolCall.function.name;
-            const rawArgs = toolCall.function.arguments;
+            if (!functionCall.id || !functionCall.name) {
+                throw new Error("Function call ID is missing");
+            }
 
-            let functionResponse: string;
+            let part;
 
             if (functionName == 'create_task') {
-                const parsed = JSON.parse(rawArgs);
-                const arg = createTaskSchema.parse(parsed);
+                    const arg = createTaskSchema.parse(functionCall.args);
 
-                const result = await createTodoTask(arg.title, arg.dueDate)
+                    const result = await createTodoTask(arg.title, arg.dueDate)
 
-                functionResponse = JSON.stringify({
-                    status: "success",
-                    createdTask: result,
-                })
-
+                    part =  createPartFromFunctionResponse(
+                        functionCall.id!,
+                        functionCall.name!,
+                        { status: "success", createdTask: result,}
+                    )
             }
             else if (functionName == 'get_tasks') {
-                const tasks = await getActiveTasks();
-                functionResponse = JSON.stringify(tasks);
+                const tasks = await getActiveTasks()
+                part = createPartFromFunctionResponse(
+                    functionCall.id!,
+                    functionCall.name!,
+                    {tasks}
+                )
             }
             else if (functionName == 'get_schedule') {
-                const parsed = JSON.parse(rawArgs);
-                const args = getScheduleSchema.parse(parsed);
+                const args = getScheduleSchema.parse(functionCall.args)
 
                 const [lessons, tasks] = await Promise.all([
                     getScheduleByRange(args.startDate, args.endDate),
                     getActiveTasks()
-                ]);
+                ])
 
-                functionResponse = JSON.stringify({
-                    schedule: lessons,
-                    activeTasks: tasks,
-                })
+                part = createPartFromFunctionResponse(
+                    functionCall.id,
+                    functionCall.name,
+                    { schedule: lessons, activeTasks: tasks,}
+                )
             }
             else {
-                functionResponse = JSON.stringify({
-                    status: "error",
-                    message: `Unknown function: ${functionName}`,
-                });
+                part = createPartFromFunctionResponse(
+                    functionCall.id,
+                    functionCall.name,
+                    {  status: "error", message: `Unknown function: ${functionName}`}
+                )
             }
+            history.push(part)
 
-            messages.push({
-                role: 'tool',
-                tool_call_id: toolCall.id,
-                content: functionResponse,
-            })
         }
-
-        const secondCompletion = await groq.chat.completions.create({
-            model: config.GROQ_MODEL,
-            messages: messages,
-            temperature: 0.2,
+        const secondResp = await chat.sendMessage({
+            message: history,
         })
 
-        return secondCompletion.choices[0].message;
+
+        return secondResp.text ?? "Не удалось получить ответ."
     }
     else {
-        return responseMessage;
+        return response.text ?? "Не удалось получить ответ."
     }
+
 }

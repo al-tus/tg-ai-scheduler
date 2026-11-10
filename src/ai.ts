@@ -5,9 +5,8 @@ import {createTodoTask, getActiveTasks} from "./todo";
 import {getScheduleByRange} from "./schedule";
 import {getSystemPrompt} from "./sp";
 
-const gem = new GoogleGenAI({apiKey: config.GEMINI_API_KEY})
 
-const sp = getSystemPrompt()
+const gem = new GoogleGenAI({apiKey: config.GEMINI_API_KEY})
 
 export async function transcribeAudio(fileUrl: string): Promise<string> {
 
@@ -33,8 +32,9 @@ export async function transcribeAudio(fileUrl: string): Promise<string> {
 }
 
 export async function processUserMessage(text: string): Promise<string> {
-
+    const sp = getSystemPrompt()
     const history = []
+    console.log(text)
 
     const chat = gem.chats.create({
         model: config.GEMINI_MODEL,
@@ -101,10 +101,14 @@ export async function processUserMessage(text: string): Promise<string> {
             history.push(part)
 
         }
+
+        console.log(response.functionCalls)
+
         const secondResp = await chat.sendMessage({
             message: history,
         })
 
+        console.log(secondResp.functionCalls)
 
         return secondResp.text ?? "Не удалось получить ответ."
     }

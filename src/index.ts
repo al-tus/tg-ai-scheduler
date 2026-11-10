@@ -1,8 +1,11 @@
 import { Bot } from "grammy";
 import { config } from "./config";
 import {processUserMessage, transcribeAudio} from './ai'
+import { runInterval } from './schedule';
 
-const bot = new Bot(config.BOT_TOKEN)
+export const bot = new Bot(config.BOT_TOKEN)
+
+runInterval();
 
 bot.use( async (ctx, next) => {
     if (ctx.from?.id !== config.ADMIN_ID) {

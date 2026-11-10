@@ -10,7 +10,10 @@ const envSchema = z.object({
     MS_CLIENT_ID: reqString,
     MS_CLIENT_SECRET: reqString,
     MS_REFRESH_TOKEN: reqString,
-    ADMIN_ID: z.coerce.number().positive()
+    ADMIN_ID: z.coerce.number().positive(),
+    COOKIE_IDENTITY: reqString,
+    COOKIE_CSRF:reqString,
+    PHPSESSID:reqString,
 })
 
 export const config = envSchema.parse(process.env)

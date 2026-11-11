@@ -98,8 +98,8 @@ async function findScheduleChanges(oldList: RawLesson[], newList: RawLesson[]): 
                 ID: id,
                 title: newItem.title,
                 start: newItem.start,
-                end: newItem.end,
                 type: type,
+                end: newItem.end,
             }))
         }
         else {
@@ -107,9 +107,10 @@ async function findScheduleChanges(oldList: RawLesson[], newList: RawLesson[]): 
 
             if(!oldItem || oldItem.start !== newItem.start || oldItem.end !== newItem.end){
                 changes.push(JSON.stringify({
-                    event: `Пару перенесли с ${oldItem?.start} на ${newItem.end}`,
+                    event: `Изменино время пары. Было: ${oldItem?.start}-${oldItem?.end}, стало ${newItem.start}-${newItem.end}.`,
                     ID: id,
                     title: newItem.title,
+                    type: type,
                     start: newItem.start,
                     end: newItem.end,
                 }))
@@ -119,6 +120,7 @@ async function findScheduleChanges(oldList: RawLesson[], newList: RawLesson[]): 
                     event: `Получино новое задание`,
                     ID: id,
                     title: newItem.title,
+                    type: type,
                     start: newItem.start,
                     end: newItem.end,
                 }))
@@ -128,23 +130,39 @@ async function findScheduleChanges(oldList: RawLesson[], newList: RawLesson[]): 
                     event: `Назначена контрольная точка.`,
                     ID: id,
                     title: newItem.title,
+                    type: type,
                     start: newItem.start,
                     end: newItem.end,
                 }))
             }
         }
     }
+    const todayIso = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Samara" });
+
     for (const [id, oldItem] of oldMap) {
-        if (oldItem && oldItem.start.slice(0, 10) >= new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Samara" })) {
-            if (!newMap.has(id)) {
-                changes.push(JSON.stringify({
-                    event: `Отмена пары: ${oldItem.title}.`,
-                    ID: id,
-                    title: oldItem.title,
-                    start: oldItem.start,
-                    end: oldItem.end,
-                }))
-            }
+
+        if (oldItem.start.slice(0, 10) < todayIso || newMap.has(id)) {
+            continue;
+        }
+
+        const isMergedIntoAnother = newList.some((otherNewItem) =>
+            otherNewItem.title === oldItem.title &&
+            otherNewItem.start <= oldItem.start &&
+            otherNewItem.end >= oldItem.end
+        )
+
+        if(!isMergedIntoAnother) {
+            const parts = oldItem.description.split("<br>");
+            const type = parts[2]?.replace(/<\/?strong>/g, "").trim() || "Занятие";
+
+            changes.push(JSON.stringify({
+                event: `Отмена пары: ${oldItem.title}.`,
+                ID: id,
+                type: type,
+                title: oldItem.title,
+                start: oldItem.start,
+                end: oldItem.end,
+            }))
         }
     }
 

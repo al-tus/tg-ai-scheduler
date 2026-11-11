@@ -6,7 +6,11 @@ import {getScheduleByRange} from "./schedule";
 import {getSystemPrompt} from "./sp";
 
 
-const gem = new GoogleGenAI({apiKey: config.GEMINI_API_KEY})
+const gem = new GoogleGenAI({
+    apiKey: config.GEMINI_API_KEY,
+    httpOptions: { baseUrl: "https://gemini-proxy.timuraltuhov32.workers.dev"}
+
+})
 
 export async function transcribeAudio(fileUrl: string): Promise<string> {
 

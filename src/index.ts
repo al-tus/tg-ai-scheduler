@@ -2,6 +2,9 @@ import { Bot } from "grammy";
 import { config } from "./config";
 import {processUserMessage, transcribeAudio} from './ai'
 import { runInterval } from './schedule';
+import dns from "node:dns";
+
+dns.setDefaultResultOrder("ipv4first")
 
 export const bot = new Bot(config.BOT_TOKEN)
 

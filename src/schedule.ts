@@ -20,6 +20,7 @@ export interface CleanLesson {
     time: string;
     subject: string;
     type: string;
+    status: string;
     teacher: string;
     hasControlPoint: boolean;
     hasUniversityPortalTask: boolean;
@@ -37,20 +38,38 @@ export function getScheduleByRange(startDate: string, endDate: string): CleanLes
     })
 
     filtered.sort((a, b) => a.start.localeCompare(b.start));
+    const now = new Date();
+    const todayIso = now.toLocaleDateString("sv-SE", { timeZone: "Europe/Samara" });
+    const currentHm = now.toLocaleTimeString("ru-RU", {
+        timeZone: "Europe/Samara",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+
 
     return filtered.map((item) => {
         const parts = item.description.split("<br>");
-        const time = `${item.start.slice(11, 16)}-${item.end.slice(11, 16)}`;
+        const startHm = item.start.slice(11, 16);
+        const endHm = item.end.slice(11, 16);
+        const time = `${startHm}-${endHm}`;
         const teacher = parts[1]?.trim() || "Не указан";
         const type = parts[2]?.replace(/<\/?strong>/g, "").trim() || "Занятие";
-
         const dateObj = new Date(item.start);
+        const lessonDate = item.start.slice(0, 10);
+
         const dayOfWeek = dateObj.toLocaleDateString("ru-RU", {weekday: 'long'})
+        let status: "прошла" | "идет сейчас" | "предстоит" = "предстоит";
+        if (lessonDate < todayIso || (lessonDate === todayIso && endHm <= currentHm)) {
+            status = "прошла";
+        } else if (lessonDate === todayIso && startHm <= currentHm && endHm > currentHm) {
+            status = "идет сейчас";
+        }
 
         return{
             date: item.start.slice(0, 10),
             dayOfWeek,
             time,
+            status,
             subject: item.title,
             type,
             teacher,

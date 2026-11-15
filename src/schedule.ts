@@ -200,30 +200,47 @@ async function saveRawSchedule(filePath: string, data:  RawLesson[]) {
 async function fetchLiveSchedule(): Promise<RawLesson[]> {
 
         const url = buildUrl()
+        let response:Response
 
-        const response = await fetch(url, {
-            headers: {
-                'Accept': '*/*',
-                'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-                'Connection': 'keep-alive',
-                'Referer': 'https://lk.samgtu.ru/distancelearning/distancelearning/index',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
-                'sec-ch-ua': '"Not-A.Brand";v="99", "Google Chrome";v="157", "Chromium";v="157"',
-                'sec-ch-ua-mobile': '?0',
-                'sec-ch-ua-platform': '"Windows"',
-                'Cookie': `_identity=${config.COOKIE_IDENTITY}; _csrf=${config.COOKIE_CSRF}; PHPSESSID=${config.PHPSESSID}`
-            }
-        });
 
-        const data = await response.json()
-
-        if (!response.ok || !Array.isArray(data)) {
-            throw new Error("SamGTU API error")
+        try {
+            response = await fetch(url, {
+                signal: AbortSignal.timeout(10_000),
+                headers: {
+                    'Accept': '*/*',
+                    'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+                    'Connection': 'keep-alive',
+                    'Referer': 'https://lk.samgtu.ru/distancelearning/distancelearning/index',
+                    'Sec-Fetch-Dest': 'empty',
+                    'Sec-Fetch-Mode': 'cors',
+                    'Sec-Fetch-Site': 'same-origin',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36',
+                    'sec-ch-ua': '"Not-A.Brand";v="99", "Google Chrome";v="157", "Chromium";v="157"',
+                    'sec-ch-ua-mobile': '?0',
+                    'sec-ch-ua-platform': '"Windows"',
+                    'Cookie': `_identity=${config.COOKIE_IDENTITY}; _csrf=${config.COOKIE_CSRF}; PHPSESSID=${config.PHPSESSID}`
+                }
+            });
+        } catch(err) {
+            throw new Error(`SamGTU: network unreachable or timeout (${(err as Error).message})`);
         }
-        return data ?? []
+
+        if (!response.ok) {
+            throw new Error(`SamGTU API error: HTTP ${response.status}`)
+        }
+
+        let data: unknown
+        try {
+            data = await response.json()
+        } catch{
+            throw new Error(`SamGTU: The response is not JSON; it looks like the cookies have expired.`)
+        }
+
+        if (!Array.isArray(data)){
+            throw new Error(`A whole range of activities was expected, but something else arrived.`)
+        }
+
+        return data as RawLesson[]
 }
 
 
